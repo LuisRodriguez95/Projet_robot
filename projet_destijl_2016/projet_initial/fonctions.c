@@ -18,6 +18,13 @@ void envoyer(void * arg) {
     }
 }
 
+/*Creer fonction de connection entre le moniteur et le shuttle qu'il faut optimiser pour:
+- Attendre la connexion d'un socket en provenance du moniteur
+- Détecter la perte de communication entre le moniteur et le superviseur suite à l'appel à:
+	- d_server_send(DServeur * This, Dmessage * msg) : Retourne valeur négative ou 0 si la connexion a été perdue
+	- d_server_receive(DServeur * This, Dmessage * msg) : Retourne valeur négative ou 0 si la connexion a été perdue
+- Se remettre en attente de connexion à la suite d'un  échec de communication avec le moniteur
+*/
 void connecter(void * arg) {
     int status;
     DMessage *message;
