@@ -1,10 +1,9 @@
 #include "fonctions.h"
 
-//TEST GIT 2
-
 int write_in_queue(RT_QUEUE *msgQueue, void * data, int size);
-
+TM_INFINITETM_INFINITE
 void envoyer(void * arg) {
+	
     DMessage *msg;
     int err;
 
@@ -20,6 +19,7 @@ void envoyer(void * arg) {
     }
 }
 
+
 /*Creer fonction de connection entre le moniteur et le shuttle qu'il faut optimiser pour:
 - Attendre la connexion d'un socket en provenance du moniteur
 - Détecter la perte de communication entre le moniteur et le superviseur suite à l'appel à:
@@ -27,13 +27,21 @@ void envoyer(void * arg) {
 	- d_server_receive(DServeur * This, Dmessage * msg) : Retourne valeur négative ou 0 si la connexion a été perdue
 - Se remettre en attente de connexion à la suite d'un  échec de communication avec le moniteur
 */
+
+void connecterMoniteur(void * arg){
+	
+
+}
+
 void connecter(void * arg) {
-    int status;
+	rt_sem_p(&semConnecterMonitor,TM_INFINITE);
+	int status;
     DMessage *message;
 
     rt_printf("tconnect : Debut de l'exécution de tconnect\n");
 
     while (1) {
+		rt_sem_v(&semConnecterMonitor);
         rt_printf("tconnect : Attente du sémarphore semConnecterRobot\n");
         rt_sem_p(&semConnecterRobot, TM_INFINITE);
         rt_printf("tconnect : Ouverture de la communication avec le robot\n");
@@ -69,10 +77,12 @@ void communiquer(void *arg) {
 
     rt_printf("tserver : Début de l'exécution de serveur\n");
     serveur->open(serveur, "8000");
+	
+	rt_sem_v(&semConnecterMonitor);//UNLOCK SEMAPHORE QUI EST DEJA BLOQUE
     rt_printf("tserver : Connexion\n");
 
     rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-    etatCommMoniteur = 0;
+    etatCommMoniteur = 0; //0 signifie que la communication Moniteur<-->Superviseur est établie
     rt_mutex_release(&mutexEtat);
 
     while (var1 > 0) {
@@ -107,7 +117,8 @@ void communiquer(void *arg) {
 }
 
 void deplacer(void *arg) {
-    int status = 1;
+	rt_sem_p(&semConnecterMonitor,TM_INFINITE);    
+	int status = 1;
     int gauche;
     int droite;
     DMessage *message;
@@ -116,6 +127,7 @@ void deplacer(void *arg) {
     rt_task_set_periodic(NULL, TM_NOW, 1000000000);
 
     while (1) {
+		rt_sem_v(&semConnecterMonitor);
         /* Attente de l'activation périodique */
         rt_task_wait_period(NULL);
         rt_printf("tmove : Activation périodique\n");
