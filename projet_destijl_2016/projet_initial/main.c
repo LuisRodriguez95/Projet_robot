@@ -68,7 +68,8 @@ void initStruct(void) {
         exit(EXIT_FAILURE);
     }
 
-    if (err = rt_sem_create(&semConnecterMonitor, NULL, TM_INFINITE, S_FIFO)) {
+
+    if (err = rt_sem_create(&semWatchdog, NULL, TM_INFINITE, S_FIFO)) {
         rt_printf("Error semaphore create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
@@ -87,6 +88,10 @@ void initStruct(void) {
         exit(EXIT_FAILURE);
     }
     if (err = rt_task_create(&tenvoyer, NULL, 0, PRIORITY_TENVOYER, 0)) {
+        rt_printf("Error task create: %s\n", strerror(-err));
+        exit(EXIT_FAILURE);
+    }
+    if (err = rt_task_create(&twatchdog, NULL, 0, PRIORITY_TWATCHDOG, 0)) {
         rt_printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }

@@ -20,32 +20,18 @@ void envoyer(void * arg) {
 }
 
 
-/*Creer fonction de connection entre le moniteur et le shuttle qu'il faut optimiser pour:
-- Attendre la connexion d'un socket en provenance du moniteur
-- Détecter la perte de communication entre le moniteur et le superviseur suite à l'appel à:
-	- d_server_send(DServeur * This, Dmessage * msg) : Retourne valeur négative ou 0 si la connexion a été perdue
-	- d_server_receive(DServeur * This, Dmessage * msg) : Retourne valeur négative ou 0 si la connexion a été perdue
-- Se remettre en attente de connexion à la suite d'un  échec de communication avec le moniteur
-*/
-
-void connecterMoniteur(void * arg){
-	
-
-}
-
 void connecter(void * arg) {
-	rt_sem_p(&semConnecterMonitor,TM_INFINITE);
 	int status;
     DMessage *message;
 
     rt_printf("tconnect : Debut de l'exécution de tconnect\n");
 
     while (1) {
-		rt_sem_v(&semConnecterMonitor);
         rt_printf("tconnect : Attente du sémarphore semConnecterRobot\n");
         rt_sem_p(&semConnecterRobot, TM_INFINITE);
         rt_printf("tconnect : Ouverture de la communication avec le robot\n");
         status = robot->open_device(robot);
+        rt_sem_v(&semWatchdog);
 
         rt_mutex_acquire(&mutexEtat, TM_INFINITE);
         etatCommRobot = status;
@@ -76,48 +62,119 @@ void communiquer(void *arg) {
     int num_msg = 0;
 
     rt_printf("tserver : Début de l'exécution de serveur\n");
-    serveur->open(serveur, "8000");
-	
-	rt_sem_v(&semConnecterMonitor);//UNLOCK SEMAPHORE QUI EST DEJA BLOQUE
-    rt_printf("tserver : Connexion\n");
+    while(1){ /*Reponds a l'encadre page 9 pour reesayer la connexion quand serveur_receive echoue*/
+        serveur->open(serveur, "8000");
+    	
+        rt_printf("tserver : Connexion\n");
 
-    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
-    etatCommMoniteur = 0; //0 signifie que la communication Moniteur<-->Superviseur est établie
-    rt_mutex_release(&mutexEtat);
+        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+        etatCommMoniteur = 0; //0 signifie que la communication Moniteur<-->Superviseur est établie
+        rt_mutex_release(&mutexEtat);
 
-    while (var1 > 0) {
-        rt_printf("tserver : Attente d'un message\n");
-        var1 = serveur->receive(serveur, msg);
-        num_msg++;
-        if (var1 > 0) {
-            switch (msg->get_type(msg)) {
-                case MESSAGE_TYPE_ACTION:
-                    rt_printf("tserver : Le message %d reçu est une action\n",
-                            num_msg);
-                    DAction *action = d_new_action();
-                    action->from_message(action, msg);
-                    switch (action->get_order(action)) {
-                        case ACTION_CONNECT_ROBOT:
-                            rt_printf("tserver : Action connecter robot\n");
-                            rt_sem_v(&semConnecterRobot);
-                            break;
-                    }
-                    break;
-                case MESSAGE_TYPE_MOVEMENT:
-                    rt_printf("tserver : Le message reçu %d est un mouvement\n",
-                            num_msg);
-                    rt_mutex_acquire(&mutexMove, TM_INFINITE);
-                    move->from_message(move, msg);
-                    move->print(move);
-                    rt_mutex_release(&mutexMove);
-                    break;
+        while (var1 > 0) {
+            rt_printf("tserver : Attente d'un message\n");
+            var1 = serveur->receive(serveur, msg);
+            num_msg++;
+            if (var1 > 0) {
+                switch (msg->get_type(msg)) {
+                    case MESSAGE_TYPE_ACTION:
+                        rt_printf("tserver : Le message %d reçu est une action\n",
+                                num_msg);
+                        DAction *action = d_new_action();
+                        action->from_message(action, msg);
+                        switch (action->get_order(action)) {
+                            case ACTION_CONNECT_ROBOT:
+                                rt_printf("tserver : Action connecter robot\n");
+                                rt_sem_v(&semConnecterRobot);
+                                break;
+                        }
+                        break;
+                    case MESSAGE_TYPE_MOVEMENT:
+                        rt_printf("tserver : Le message reçu %d est un mouvement\n",
+                                num_msg);
+                        rt_mutex_acquire(&mutexMove, TM_INFINITE);
+                        move->from_message(move, msg);
+                        move->print(move);
+                        rt_mutex_release(&mutexMove);
+                        break;
+                }
             }
         }
     }
 }
 
-void deplacer(void *arg) {
-	rt_sem_p(&semConnecterMonitor,TM_INFINITE);    
+void gerer_cpt(int action){
+    if (action == INCREMENTER){
+        rt_mutex_acquire(&mutexCompteur, TM_INFINITE);
+        Compteur += 1;
+        rt_mutex_release(&mutexCompteur);
+    }
+    else{
+        rt_mutex_acquire(&mutexCompteur, TM_INFINITE);
+        Compteur = 0;
+        rt_mutex_release(&mutexCompteur);
+    }
+}
+
+void reinitialiser(){
+    DMessage *message;
+    reinisilation_de_la_comm();
+
+    rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+    state := etatCommRobot;
+    etatCommRobot = 0;
+    rt_mutex_release(&mutexEtat);
+
+    message = d_new_message(); /*Envoie message au moniteur*/
+    message->put_state(message, status);
+
+    rt_printf("reinitialiser la connexion\n");
+    message->print(message, 100);
+
+    if (write_in_queue(&queueMsgGUI, message, sizeof (DMessage)) < 0) {
+        message->free(message);
+    }
+
+}
+
+void watchdog(void *arg){
+    int status = 1;
+    int compteur = 0;
+    DMessage *message;
+    rt_sem_p(&semWatchdog, TM_INFINITE);
+    while (1){
+        rt_mutex_acquire(&mutexEtat, TM_INFINITE);
+        status = etatCommRobot;
+        rt_mutex_release(&mutexEtat);
+        
+        if (status == STATUS_OK) {
+            rt_mutex_acquire(&mutexCompteur, TM_INFINITE);
+            compteur = Compteur;
+            rt_mutex_release(&mutexCompteur);
+            if (compteur > CPT_MAX){ 
+                reinitialiser();
+            }
+            else {
+
+                status = robot->d_robot_reload_wdt(robot);
+
+                if (status != STATUS_OK) {
+
+                    gerer_cpt(INCREMENTER);
+
+                }
+                else{
+                    gerer_cpt(REINITIALISER);
+
+                }
+            }
+        }
+    }
+}
+
+
+
+void deplacer(void *arg) {   
 	int status = 1;
     int gauche;
     int droite;
@@ -127,7 +184,6 @@ void deplacer(void *arg) {
     rt_task_set_periodic(NULL, TM_NOW, 1000000000);
 
     while (1) {
-		rt_sem_v(&semConnecterMonitor);
         /* Attente de l'activation périodique */
         rt_task_wait_period(NULL);
         rt_printf("tmove : Activation périodique\n");
