@@ -1,4 +1,3 @@
-
 /* 
  * File:   global.h
  * Author: pehladik
@@ -16,11 +15,13 @@ extern RT_TASK tServeur;
 extern RT_TASK tconnect;
 extern RT_TASK tmove;
 extern RT_TASK tenvoyer;
+extern RT_TASK tbatterie;
 
 /* @descripteurs des mutex */
 extern RT_MUTEX mutexEtat;
 extern RT_MUTEX mutexMove;
 extern RT_MUTEX mutexCompteur;
+extern RT_MUTEX mutexEnvoiRobot;
 
 /* @descripteurs des sempahore */
 extern RT_SEM semConnecterRobot;
@@ -31,16 +32,13 @@ extern RT_QUEUE queueMsgGUI;
 /* @variables partagées */
 extern int etatCommMoniteur;
 extern int etatCommRobot;
-extern int Compteur;
+extern int compteurPerteRobot;
 extern DServer *serveur;
 extern DRobot *robot;
 extern DMovement *move;
 
 /* @constantes */
 extern int MSG_QUEUE_SIZE;
-extern int INCREMENTER;
-extern int REINITIALISER;
-extern int CPT_MAX;
 extern int PRIORITY_TSERVEUR;
 extern int PRIORITY_TCONNECT;
 extern int PRIORITY_TMOVE;

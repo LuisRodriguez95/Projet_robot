@@ -11,29 +11,24 @@ RT_TASK tServeur;
 RT_TASK tconnect;
 RT_TASK tmove;
 RT_TASK tenvoyer;
+RT_TASK tbatterie;
 
 RT_MUTEX mutexEtat;
 RT_MUTEX mutexMove;
 RT_MUTEX mutexCompteur;
-
 RT_SEM semConnecterRobot;
+RT_MUTEX mutexEnvoiRobot;
 
 RT_QUEUE queueMsgGUI;
 
 int etatCommMoniteur = 1;
 int etatCommRobot = 1;
-int Compteur = 0;
+int compteurPerteRobot = 0;
 DRobot *robot;
 DMovement *move;
 DServer *serveur;
 
-
 int MSG_QUEUE_SIZE = 10;
-
-int INCREMENTER = 1;
-
-int REINITIALISER = 0;
-int CPT_MAX = 3;
 
 int PRIORITY_TSERVEUR = 30;
 int PRIORITY_TCONNECT = 20;
